@@ -4,7 +4,7 @@
 # Install dependencies if necessary
 #
 if [[ -z "${wifiAP}" ]]; then
-  sudo apt install -y \
+  apt install -y \
 	hostapd \
 	dnsmasq \
 	mysql-server \
