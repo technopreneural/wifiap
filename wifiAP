@@ -1,0 +1,76 @@
+#!/bin/bash
+
+#
+# Install dependencies if necessary
+#
+if [[ -z "${wifiAP}" ]]; then
+  sudo apt install -y \
+	hostapd \
+	dnsmasq \
+	mysql-server \
+	freeradius \
+	freeradius-mysql
+  wifiAP=`date`
+else
+  MY_SCRIPT_VARIABLE="${DEPLOY_ENV}"
+fi
+
+#
+# Configure DHCP using dnsmasq
+#
+cat <<EOT > /etc/dnsmasq.conf
+interface=wlan0
+dhcp-range=192.168.253.201,192.168.253.220,1h
+server=8.8.8.8
+server=8.8.4.4
+EOT
+
+#
+# Configure wireless access point using hostapd
+#
+cat <<EOT > /etc/hostapd/hostapd.conf
+interface=wlan0
+ssid=wifiap
+EOT
+
+#
+# Reset wireless interface
+#
+ip link set wlan0 down
+ip addr flush dev wlan0
+sleep 1
+
+#
+# Configure wireless interface
+#
+
+ip link set wlan0 up
+ip addr add 192.168.253.1/24 dev wlan0
+sleep 3
+
+#
+# Enable IP forwarding
+#
+sysctl -w net.ipv4.ip_forward=1
+
+#
+# Configure forwarding rules using iptables
+#
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+
+#
+# Apply DHCP configuration
+#
+sudo service dnsmasq restart
+
+#
+# Activate wireless access point
+#
+hostapd /etc/hostapd/hostapd.conf
+
+#
+# Reset and flush DHCP
+#
+sudo service dnsmasq restart
