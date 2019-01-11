@@ -1,21 +1,6 @@
 #!/bin/bash
 
 #
-# Install dependencies if necessary
-#
-if [[ -z "${wifiAP}" ]]; then
-  apt install -y \
-	hostapd \
-	dnsmasq \
-	mysql-server \
-	freeradius \
-	freeradius-mysql
-  wifiAP=`date`
-else
-  MY_SCRIPT_VARIABLE="${DEPLOY_ENV}"
-fi
-
-#
 # Configure DHCP using dnsmasq
 #
 cat <<EOT > /etc/dnsmasq.conf
@@ -29,8 +14,29 @@ EOT
 # Configure wireless access point using hostapd
 #
 cat <<EOT > /etc/hostapd/hostapd.conf
+#
+# Basic configuration
+#
 interface=wlan0
 ssid=wifiap
+channel=1
+
+#
+# Enable 802.1x authentication
+#
+ieee8021x=1
+eapol_version=2
+own_ip_addr=192.168.253.1
+
+# RADIUS authentication server
+auth_server_addr=127.0.0.1
+auth_server_port=1812
+auth_server_shared_secret=testing123
+
+# RADIUS accounting server
+acct_server_addr=127.0.0.1
+acct_server_port=1813
+acct_server_shared_secret=testing123
 EOT
 
 #
@@ -38,7 +44,7 @@ EOT
 #
 ip link set wlan0 down
 ip addr flush dev wlan0
-sleep 1
+#sleep 1
 
 #
 # Configure wireless interface
@@ -46,7 +52,7 @@ sleep 1
 
 ip link set wlan0 up
 ip addr add 192.168.253.1/24 dev wlan0
-sleep 3
+#sleep 3
 
 #
 # Enable IP forwarding
@@ -56,9 +62,11 @@ sysctl -w net.ipv4.ip_forward=1
 #
 # Configure forwarding rules using iptables
 #
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
+#iptables -t nat -F
+#iptables -F
+#iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+#iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+#iptables -A FORWARD -i wlan0 -o eth0 -j ACCEPT
 
 #
 # Apply DHCP configuration
@@ -73,4 +81,4 @@ hostapd /etc/hostapd/hostapd.conf
 #
 # Reset and flush DHCP
 #
-sudo service dnsmasq restart
+#sudo service dnsmasq restart
